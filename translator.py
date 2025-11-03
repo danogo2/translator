@@ -2,11 +2,13 @@ import sys
 import asyncio
 from googletrans import Translator, LANGUAGES
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QTextEdit, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QComboBox)
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit,
+                             QVBoxLayout, QHBoxLayout, QWidget, QLabel,
+                             QPushButton, QComboBox)
 
 
 class LanguageSelector(QWidget):
+    '''Widget containing language dropdown and recent language buttons'''
 
     def __init__(self, default_lang='eng', recent_langs=None):
         super().__init__()
@@ -53,6 +55,7 @@ class LanguageSelector(QWidget):
         self.setLayout(layout)
 
     def populate_languages(self):
+        '''Add all available languages to dropdown'''
         # Convert LANGUAGES dict to sorted list od (name, code) typles
         lang_list = [(name.capitalize(), code)
                      for code, name in LANGUAGES.items()]
@@ -62,25 +65,30 @@ class LanguageSelector(QWidget):
             self.combo.addItem(name, code)
 
     def get_language_name(self, code):
+        '''Get language name from code'''
         return LANGUAGES.get(code, code).capitalize()
 
     def get_language_code(self, name):
+        '''Get language code from name'''
         for code, lang_name in LANGUAGES.items():
             if lang_name.capitalize() == name:
                 return code
         return 'en'
 
     def on_combo_changed(self, text):
+        '''Handle dropdown selection'''
         self.current_lang = self.get_language_code(text)
         self.update_recent_languages(self.current_lang)
 
     def on_recent_button_clicked(self):
+        '''Handle recent language button click'''
         button = self.sender()
         lang_code = button.property('lang_code')
         self.current_lang = lang_code
         self.combo.setCurrentText(self.get_language_name(lang_code))
 
     def update_recent_languages(self, lang_code):
+        '''Update recent lanugages list and buttons'''
         # Remove if already in list
         if lang_code in self.recent_langs:
             self.recent_langs.remove(lang_code)
@@ -102,9 +110,11 @@ class LanguageSelector(QWidget):
                 btn.setVisible(False)
 
     def get_current_language(self):
+        '''Get currently selected language code'''
         return self.current_lang
 
     def set_language(self, lang_code):
+        '''Set language programmatically'''
         self.current_lang = lang_code
         self.combo.setCurrentText(self.get_language_name(lang_code))
 
@@ -126,7 +136,7 @@ class MainWindow(QMainWindow):
         # Source language selector
         left_label = QLabel('Source Language')
         self.source_lang_selector = LanguageSelector(
-            default_lang='auto', recent_langs=['auto', 'pl', 'en'])
+            default_lang='auto', recent_langs=['auto', 'pl', 'de'])
 
         # Add "Detect language" option for source
         self.source_lang_selector.combo.insertItem(
@@ -137,7 +147,7 @@ class MainWindow(QMainWindow):
         self.text_input = QTextEdit()
         self.text_input.setPlaceholderText(
             'Type here and press Ctrl+Enter to translate')
-        self.text_input.textChanged.connect(self.text_changed)
+        self.text_input.textChanged.connect(self.on_text_changed)
 
         left_layout.addWidget(left_label)
         left_layout.addWidget(self.source_lang_selector)
@@ -170,15 +180,21 @@ class MainWindow(QMainWindow):
         self.text = ''
 
     async def translate_text(self):
+        '''Translate text using selected languages'''
         source_lang = self.source_lang_selector.get_current_language()
         target_lang = self.target_lang_selector.get_current_language()
 
         async with Translator() as translator:
             # "auto" is the default for source language detection
-            result = await translator.translate(self.text, src=source_lang if source_lang != 'auto' else 'auto', dest=target_lang)
+            result = await translator.translate(
+                self.text,
+                src=source_lang if source_lang != 'auto' else 'auto',
+                dest=target_lang
+            )
             return result
 
     def translate_and_display(self):
+        '''Perform translation and display result'''
         if self.text.strip():
             try:
                 translated = asyncio.run(self.translate_text())
@@ -196,11 +212,13 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 self.text_display.setText(f'Translation error: {str(e)}')
 
-    def text_changed(self):
+    def on_text_changed(self):
+        '''Update text variable when input changes'''
         # Extract all the text content as a plain string. Returns just a text without any formatting, in contrast to `toHtml()`
         self.text = self.text_input.toPlainText()
 
     def keyPressEvent(self, event):
+        '''Handle keyboard shortcuts'''
         # Translate on Ctrl+Enter
         if event.key() == Qt.Key.Key_Return and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             self.translate_and_display()
