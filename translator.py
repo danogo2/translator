@@ -6,21 +6,33 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit,
                              QVBoxLayout, QHBoxLayout, QWidget, QLabel,
                              QPushButton, QComboBox)
 
+BUTTON_STYLE = '''
+    QPushButton {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 5px 10px;
+        background-color: #f8f9fa;
+    }
+    QPushButton:hover {
+        background-color: #e8e9ea
+    }
+'''
+
 
 class LanguageSelector(QWidget):
     '''Widget containing language dropdown and recent language buttons'''
 
-    def __init__(self, default_lang='eng', recent_langs=None):
+    def __init__(self, default_lang='en', recent_langs=None):
         super().__init__()
 
         if recent_langs is None:
             recent_langs = ['es', 'fr', 'de']
 
-        self.current_lang = default_lang
+        self.current_lang = default_lang  # lang code like: 'en', 'pl'
         self.recent_langs = recent_langs
 
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
+        self.layout = QHBoxLayout()
+        self.layout.setContentsMargins(0, 0, 0, 0)
 
         # Language dropdown
         self.combo = QComboBox()
@@ -34,29 +46,19 @@ class LanguageSelector(QWidget):
             btn = QPushButton(self.get_language_name(lang_code))
             btn.setProperty('lang_code', lang_code)
             btn.setFlat(True)
-            btn.setStyleSheet('''
-                QPushButton {
-                    border: 1px solid #ddd;
-                    border-radius: 4px;
-                    padding: 5px 10px;
-                    background-color: #f8f9fa;
-                }
-                QPushButton:hover {
-                    background-color: #e8e9ea
-                }
-            ''')
+            btn.setStyleSheet(BUTTON_STYLE)
             btn.clicked.connect(self.on_recent_button_clicked)
             self.recent_buttons.append(btn)
-            layout.addWidget(btn)
+            self.layout.addWidget(btn)
 
-        layout.addWidget(self.combo)
-        layout.addStretch()
+        self.layout.addWidget(self.combo)
+        self.layout.addStretch()
 
-        self.setLayout(layout)
+        self.setLayout(self.layout)
 
     def populate_languages(self):
         '''Add all available languages to dropdown'''
-        # Convert LANGUAGES dict to sorted list od (name, code) typles
+        # Convert LANGUAGES dict to sorted list of (name, code) tuples
         lang_list = [(name.capitalize(), code)
                      for code, name in LANGUAGES.items()]
         lang_list.sort()
@@ -73,23 +75,24 @@ class LanguageSelector(QWidget):
         for code, lang_name in LANGUAGES.items():
             if lang_name.capitalize() == name:
                 return code
-        return 'en'
+        return 'auto'
 
-    def on_combo_changed(self, text):
+    def on_combo_changed(self, selected_lang_name):
         '''Handle dropdown selection'''
-        self.current_lang = self.get_language_code(text)
-        self.update_recent_languages(self.current_lang)
+        self.current_lang = self.get_language_code(selected_lang_name)
+        if self.current_lang != 'auto':
+            self.update_recent_languages(self.current_lang)
 
     def on_recent_button_clicked(self):
         '''Handle recent language button click'''
-        button = self.sender()
+        button = self.sender()  # returns which widget triggered the signal, it's crucial since all 3 recent buttons have 'clicked' signal connected to the same slot (on_recent_button_clicked) and 'clicked' signal doesn't send the button object automatically
         lang_code = button.property('lang_code')
         self.current_lang = lang_code
         self.combo.setCurrentText(self.get_language_name(lang_code))
 
     def update_recent_languages(self, lang_code):
         '''Update recent lanugages list and buttons'''
-        # Remove if already in list
+        # Remove if already in list to avoid duplicates (in case it is in 2nd position/index=1, truncating the list with [:3] won't get rid of it)
         if lang_code in self.recent_langs:
             self.recent_langs.remove(lang_code)
 
@@ -119,6 +122,38 @@ class LanguageSelector(QWidget):
         self.combo.setCurrentText(self.get_language_name(lang_code))
 
 
+class LanguageSelectorSource(LanguageSelector):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Add "Detect language" option for source
+        self.combo.insertItem(
+            0, 'Detect language', 'auto')
+        self.combo.setCurrentIndex(0)
+        self.current_lang = 'auto'
+        # Add "Detect language" button
+        btn_detect = QPushButton('Detect language')
+        btn_detect.setProperty('lang_code', 'auto')
+        btn_detect.setFlat(True)
+        btn_detect.setStyleSheet('''
+            QPushButton {
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 5px 10px;
+                background-color: #f8f9fa;
+            }
+            QPushButton:hover {
+                background-color: #e8e9ea
+            }
+        ''')
+        btn_detect.clicked.connect(self.on_detect_button_clicked)
+        self.layout.insertWidget(0, btn_detect)
+
+    def on_detect_button_clicked(self):
+        self.current_lang = 'auto'
+        self.combo.setCurrentText('Detect language')
+
+
 class MainWindow(QMainWindow):
 
     def __init__(self):
@@ -135,14 +170,8 @@ class MainWindow(QMainWindow):
 
         # Source language selector
         left_label = QLabel('Source Language')
-        self.source_lang_selector = LanguageSelector(
-            default_lang='auto', recent_langs=['auto', 'pl', 'de'])
-
-        # Add "Detect language" option for source
-        self.source_lang_selector.combo.insertItem(
-            0, 'Detect language', 'auto')
-        self.source_lang_selector.combo.setCurrentIndex(0)
-        self.source_lang_selector.current_lang = 'auto'
+        self.source_lang_selector = LanguageSelectorSource(
+            default_lang='auto', recent_langs=['en', 'pl', 'de'])
 
         self.text_input = QTextEdit()
         self.text_input.setPlaceholderText(
